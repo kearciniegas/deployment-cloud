@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-script
+#  namespace: default
+data:
+  index.js: |
+    var os = require('os');
+    var http = require('http');
+    
+    http.createServer(function (req, res) {
+      console.log(req.headers);
+      console.log(req.method, req.url);
+      
+      res.setHeader('Content-Type', 'application/json');
+
+      res.write(JSON.stringify({
+          hostname: os.hostname(),
+          headers: req.headers,
+          method: req.method,
+          url: req.url
+      }));
+      
+      res.end(); //end the response
+    }).listen(3000);
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-deployment
+  labels:
+    app: node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node
+  template:
+    metadata:
+      labels:
+        app: node
+    spec:
+      containers:
+      - name: node
+        image: node:13.7.0-alpine3.10
+        command: [ "node", "/app/index.js" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app
+        ports:
+        - containerPort: 3000
+      volumes:
+      - name: config-volume
+        configMap:
+        # Provide the name of the ConfigMap containing the files you want
+        # to add to the container
+          name: node-script
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: node
+  ports: 
+    - port: 3000
+---
